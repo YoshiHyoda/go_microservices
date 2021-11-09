@@ -20,7 +20,9 @@ func NewProducts(l *log.Logger) *Products {
 
 func (p *Products) GetProducts(rw http.ResponseWriter, r *http.Request) {
 	p.l.Println("Handle GET Products")
+
 	lp := data.GetProducts()
+
 	err := lp.ToJSON(rw)
 	if err != nil {
 		http.Error(rw, "Unable to marshal json", http.StatusInternalServerError)
@@ -34,11 +36,11 @@ func (p *Products) AddProduct(rw http.ResponseWriter, r *http.Request) {
 	data.AddProduct(&prod)
 }
 
-func (p *Products) UpdateProducts(rw http.ResponseWriter, r *http.Request) {
+func (p Products) UpdateProducts(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(rw, "Unable to conver id", http.StatusBadRequest)
+		http.Error(rw, "Unable to convert id", http.StatusBadRequest)
 		return
 	}
 
@@ -50,6 +52,7 @@ func (p *Products) UpdateProducts(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "Product not found", http.StatusNotFound)
 		return
 	}
+
 	if err != nil {
 		http.Error(rw, "Product not found", http.StatusInternalServerError)
 		return
@@ -58,9 +61,9 @@ func (p *Products) UpdateProducts(rw http.ResponseWriter, r *http.Request) {
 
 type KeyProduct struct{}
 
-func (p Products) MiddlewareProductValidation(next http.Handler) http.Handler {
+func (p Products) MiddlewareValidateProduct(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		prod := &data.Product{}
+		prod := data.Product{}
 
 		err := prod.FromJSON(r.Body)
 		if err != nil {
@@ -70,8 +73,8 @@ func (p Products) MiddlewareProductValidation(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), KeyProduct{}, prod)
-		req := r.WithContext(ctx)
+		r = r.WithContext(ctx)
 
-		next.ServeHTTP(rw, req)
+		next.ServeHTTP(rw, r)
 	})
 }
