@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"go_microservices/data"
 	"log"
 	"net/http"
@@ -38,7 +39,7 @@ func (p *Products) UpdateProducts(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(rw, "Unable to conver id", http.StatusBadRequest)
+		http.Error(rw, "Unable to convert id", http.StatusBadRequest)
 		return
 	}
 
@@ -58,9 +59,9 @@ func (p *Products) UpdateProducts(rw http.ResponseWriter, r *http.Request) {
 
 type KeyProduct struct{}
 
-func (p Products) MiddlewareProductValidation(next http.Handler) http.Handler {
+func (p Products) MiddlewareValidateProduct(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		prod := &data.Product{}
+		prod := data.Product{}
 
 		err := prod.FromJSON(r.Body)
 		if err != nil {
@@ -69,9 +70,20 @@ func (p Products) MiddlewareProductValidation(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), KeyProduct{}, prod)
-		req := r.WithContext(ctx)
+		err = prod.Validate()
+		if err != nil {
+			p.l.Println("[ERROR] validating product", err)
+			http.Error(
+				rw,
+				fmt.Sprintf("Error validating product: %s", err),
+				http.StatusBadRequest,
+			)
+			return
+		}
 
-		next.ServeHTTP(rw, req)
+		ctx := context.WithValue(r.Context(), KeyProduct{}, prod)
+		r = r.WithContext(ctx)
+
+		next.ServeHTTP(rw, r)
 	})
 }
